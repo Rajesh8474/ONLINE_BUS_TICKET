@@ -1,0 +1,147 @@
+{% extends "booking/base.html" %}
+{% load static %}
+
+{% block title %}BusBook - Online Bus Ticket Booking{% endblock %}
+
+{% block extra_css %}
+<style>
+  .hero {
+    background: linear-gradient(135deg, #2d4059 0%, #1a2535 60%, #e84545 150%);
+    min-height: 420px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -50%; right: -10%;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(232,69,69,0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-content { text-align: center; color: white; z-index: 1; max-width: 700px; }
+  .hero-content h1 { font-size: 2.4rem; margin-bottom: 10px; line-height: 1.2; }
+  .hero-content h1 span { color: var(--accent); }
+  .hero-content p { opacity: 0.8; margin-bottom: 32px; font-size: 1.05rem; }
+  .search-box { background: white; border-radius: 14px; padding: 28px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); max-width: 820px; margin: 0 auto; }
+  .search-grid { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 14px; align-items: end; }
+  .search-grid .btn { height: 44px; padding: 0 28px; font-size: 1rem; white-space: nowrap; }
+  .swap-btn { background: none; border: 2px solid var(--border); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; align-self: end; margin-bottom: 4px; transition: all 0.2s; flex-shrink: 0; }
+  .swap-btn:hover { background: var(--primary); border-color: var(--primary); color: white; transform: rotate(180deg); }
+  .from-to-wrap { display: flex; gap: 10px; grid-column: span 2; align-items: end; }
+  .from-to-wrap .form-group { flex: 1; margin: 0; }
+  .popular-routes { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .popular-routes span { color: var(--text-muted); font-size: 0.85rem; }
+  .route-chip { background: var(--bg); border: 1.5px solid var(--border); padding: 5px 14px; border-radius: 20px; font-size: 0.82rem; cursor: pointer; transition: all 0.2s; color: var(--text); }
+  .route-chip:hover { border-color: var(--primary); color: var(--primary); background: #fff5f5; }
+  .features { max-width: 1100px; margin: 50px auto; padding: 0 20px; }
+  .features h2 { text-align: center; font-size: 1.6rem; margin-bottom: 32px; color: var(--text); }
+  .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+  .feature-card { background: white; border-radius: var(--radius); padding: 28px 24px; box-shadow: var(--shadow); text-align: center; transition: transform 0.2s; }
+  .feature-card:hover { transform: translateY(-4px); }
+  .feature-card .icon { font-size: 2.2rem; margin-bottom: 14px; }
+  .feature-card h3 { font-size: 1rem; margin-bottom: 8px; color: var(--text); }
+  .feature-card p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; }
+  @media (max-width: 768px) {
+    .search-grid { grid-template-columns: 1fr; }
+    .from-to-wrap { grid-column: span 1; flex-direction: column; }
+    .swap-btn { display: none; }
+    .hero-content h1 { font-size: 1.7rem; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hero">
+  <div class="hero-content">
+    <h1>Book Bus Tickets <span>Instantly</span></h1>
+    <p>Thousands of buses, hundreds of routes. Simple, fast, and reliable.</p>
+    <div class="search-box">
+      <div class="search-grid">
+        <div class="from-to-wrap">
+          <div class="form-group">
+            <label>From</label>
+            <div class="autocomplete-wrapper">
+              <input type="text" id="from-city" placeholder="Departure city" autocomplete="off">
+              <ul class="autocomplete-list" id="from-list"></ul>
+            </div>
+          </div>
+          <button class="swap-btn" onclick="swapCities()" title="Swap cities">⇄</button>
+          <div class="form-group">
+            <label>To</label>
+            <div class="autocomplete-wrapper">
+              <input type="text" id="to-city" placeholder="Arrival city" autocomplete="off">
+              <ul class="autocomplete-list" id="to-list"></ul>
+            </div>
+          </div>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Travel Date</label>
+          <input type="date" id="travel-date">
+        </div>
+        <button class="btn btn-primary" onclick="searchBuses()">🔍 Search Buses</button>
+      </div>
+      <div class="popular-routes">
+        <span>Popular:</span>
+        <div class="route-chip" onclick="quickSearch('Bhubaneswar','Kolkata')">Bhubaneswar → Kolkata</div>
+        <div class="route-chip" onclick="quickSearch('Bhubaneswar','Puri')">Bhubaneswar → Puri</div>
+        <div class="route-chip" onclick="quickSearch('Bhubaneswar','Visakhapatnam')">Bhubaneswar → Vizag</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="features">
+  <h2>Why Choose BusBook?</h2>
+  <div class="features-grid">
+    <div class="feature-card"><div class="icon">🎫</div><h3>Instant Confirmation</h3><p>Get your e-ticket immediately after booking. No waiting.</p></div>
+    <div class="feature-card"><div class="icon">💺</div><h3>Choose Your Seat</h3><p>Interactive seat map. Pick your favourite seat before booking.</p></div>
+    <div class="feature-card"><div class="icon">💰</div><h3>Best Prices</h3><p>Transparent pricing with no hidden charges. What you see is what you pay.</p></div>
+    <div class="feature-card"><div class="icon">🔄</div><h3>Easy Cancellation</h3><p>Cancel anytime. Get full refund if cancelled 24 hours before departure.</p></div>
+  </div>
+</div>
+
+<footer style="background:var(--secondary);color:rgba(255,255,255,0.7);text-align:center;padding:24px;margin-top:40px;font-size:0.85rem;">
+  <p>© 2025 BusBook — Online Bus Ticket Booking System</p>
+  <p style="margin-top:6px;font-size:0.78rem;opacity:0.5;">Built as a B.Tech Project | Not a real booking platform</p>
+</footer>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  setupAutocomplete('from-city', 'from-list');
+  setupAutocomplete('to-city', 'to-list');
+
+  const dateInput = document.getElementById('travel-date');
+  const today = new Date().toISOString().split('T')[0];
+  dateInput.min = today;
+  dateInput.value = today;
+
+  function swapCities() {
+    const f = document.getElementById('from-city');
+    const t = document.getElementById('to-city');
+    const tmp = f.value; f.value = t.value; t.value = tmp;
+  }
+
+  function searchBuses() {
+    const from = document.getElementById('from-city').value.trim();
+    const to = document.getElementById('to-city').value.trim();
+    const date = document.getElementById('travel-date').value;
+    if (!from || !to) { showToast('Please enter both cities', 'error'); return; }
+    if (from.toLowerCase() === to.toLowerCase()) { showToast('Source and destination cannot be same!', 'error'); return; }
+    if (!date) { showToast('Please select a travel date', 'error'); return; }
+    window.location.href = `/search/?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&date=${date}`;
+  }
+
+  function quickSearch(from, to) {
+    document.getElementById('from-city').value = from;
+    document.getElementById('to-city').value = to;
+  }
+
+  document.addEventListener('keydown', e => { if (e.key === 'Enter') searchBuses(); });
+</script>
+{% endblock %}

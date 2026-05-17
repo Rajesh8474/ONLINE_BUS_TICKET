@@ -1,0 +1,238 @@
+{% extends "booking/base.html" %}
+{% load static %}
+
+{% block title %}Checkout - BusBook{% endblock %}
+
+{% block extra_css %}
+<style>
+  .checkout-layout { max-width: 900px; margin: 28px auto; padding: 0 20px; display: grid; grid-template-columns: 1fr 320px; gap: 24px; }
+  .step-header { display: flex; gap: 8px; margin-bottom: 20px; }
+  .step { flex: 1; text-align: center; padding: 10px; background: var(--bg); border-radius: 8px; font-size: 0.82rem; color: var(--text-muted); font-weight: 500; }
+  .step.active { background: var(--primary); color: white; }
+  .step.done { background: var(--success); color: white; }
+  .section-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; margin-bottom: 20px; }
+  .section-card h3 { margin-bottom: 18px; font-size: 1rem; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  .passenger-row { background: var(--bg); border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+  .passenger-row h4 { font-size: 0.88rem; margin-bottom: 12px; color: var(--text-muted); }
+  .row3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
+  .payment-options { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .pay-option { flex: 1; min-width: 120px; border: 2px solid var(--border); border-radius: 10px; padding: 12px; text-align: center; cursor: pointer; transition: all 0.2s; font-size: 0.88rem; }
+  .pay-option.selected { border-color: var(--primary); background: #fff5f5; }
+  .pay-option .icon { font-size: 1.5rem; display: block; margin-bottom: 4px; }
+  .pay-form { display: none; }
+  .pay-form.show { display: block; }
+  .summary-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; position: sticky; top: 80px; }
+  .summary-card h3 { margin-bottom: 14px; font-size: 1rem; }
+  .fare-row { display: flex; justify-content: space-between; font-size: 0.88rem; margin-bottom: 8px; color: var(--text-muted); }
+  .fare-row.total { font-weight: 700; font-size: 1rem; color: var(--text); border-top: 2px solid var(--border); padding-top: 10px; margin-top: 8px; }
+  .seat-tag { display: inline-block; background: #e8f4fd; color: #2980b9; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; margin: 2px; }
+  @media(max-width:768px) { .checkout-layout { grid-template-columns: 1fr; } .summary-card { position: static; } .row3 { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Complete Your Booking</h1>
+  <p>Just a few more details and you're all set!</p>
+</div>
+
+<div class="checkout-layout">
+  <div>
+    <div class="step-header">
+      <div class="step active" id="step1-tab">1. Passenger Details</div>
+      <div class="step" id="step2-tab">2. Payment</div>
+      <div class="step" id="step3-tab">3. Confirm</div>
+    </div>
+
+    <!-- Passenger Details -->
+    <div id="step1-content">
+      <div class="section-card">
+        <h3>👥 Passenger Information</h3>
+        <div id="passenger-forms"></div>
+      </div>
+      <div class="section-card">
+        <h3>📍 Travel Preferences</h3>
+        <div class="form-group"><label>Boarding Point</label><select id="boarding-point"></select></div>
+        <div class="form-group"><label>Dropping Point</label><select id="dropping-point"></select></div>
+        <div class="form-group"><label>Contact Email (for ticket)</label><input type="email" id="contact-email" placeholder="your@email.com"></div>
+        <div class="form-group"><label>Contact Phone</label><input type="tel" id="contact-phone" placeholder="9876543210"></div>
+      </div>
+      <button class="btn btn-primary" onclick="goToPayment()">Continue to Payment →</button>
+    </div>
+
+    <!-- Payment -->
+    <div id="step2-content" style="display:none">
+      <div class="section-card">
+        <h3>💳 Payment Method</h3>
+        <div class="payment-options">
+          <div class="pay-option selected" onclick="selectPayment('upi', this)"><span class="icon">📱</span>UPI</div>
+          <div class="pay-option" onclick="selectPayment('card', this)"><span class="icon">💳</span>Credit/Debit Card</div>
+          <div class="pay-option" onclick="selectPayment('netbanking', this)"><span class="icon">🏦</span>Net Banking</div>
+          <div class="pay-option" onclick="selectPayment('wallet', this)"><span class="icon">👛</span>Wallet</div>
+        </div>
+        <div id="upi-form" class="pay-form show">
+          <div class="form-group"><label>UPI ID</label><input type="text" id="upi-id" placeholder="yourname@upi"></div>
+        </div>
+        <div id="card-form" class="pay-form">
+          <div class="form-group"><label>Card Number</label><input type="text" id="card-num" placeholder="1234 5678 9012 3456" maxlength="19"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-group"><label>Expiry (MM/YY)</label><input type="text" placeholder="12/27" maxlength="5"></div>
+            <div class="form-group"><label>CVV</label><input type="password" placeholder="***" maxlength="3"></div>
+          </div>
+          <div class="form-group"><label>Name on Card</label><input type="text" placeholder="RAHUL SHARMA"></div>
+        </div>
+        <div id="netbanking-form" class="pay-form">
+          <div class="form-group"><label>Select Bank</label>
+            <select><option>SBI - State Bank of India</option><option>HDFC Bank</option><option>ICICI Bank</option><option>Axis Bank</option><option>Punjab National Bank</option><option>Bank of Baroda</option></select>
+          </div>
+        </div>
+        <div id="wallet-form" class="pay-form">
+          <div class="form-group"><label>Select Wallet</label>
+            <select><option>PhonePe</option><option>Paytm</option><option>Google Pay</option><option>Amazon Pay</option></select>
+          </div>
+        </div>
+        <div style="background:#fffbf0;border:1px solid #f5a623;border-radius:8px;padding:12px;font-size:0.82rem;color:#7a5a00;margin-top:10px">
+          ⚠️ This is a simulated payment. No real transaction will happen.
+        </div>
+      </div>
+      <div style="display:flex;gap:12px">
+        <button class="btn btn-outline" onclick="goBack()">← Back</button>
+        <button class="btn btn-primary" id="pay-btn" onclick="processPayment()">Pay <span id="pay-amount"></span></button>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="summary-card">
+      <h3>🎫 Your Booking</h3>
+      <div id="sidebar-summary"></div>
+    </div>
+  </div>
+</div>
+{% csrf_token %}
+{% endblock %}
+
+{% block extra_js %}
+<div id="temp-booking-data" style="display:none">{{ temp_booking_json }}</div>
+<script>
+  const tempBooking = JSON.parse(document.getElementById('temp-booking-data').textContent);
+  const userName = '{{ user.name }}';
+  const userEmail = '{{ user.email }}';
+  const userPhone = '{{ user.phone }}';
+  const userAge = '{{ user.age }}';
+  let selectedPayMethod = 'upi';
+
+  // Pre-fill contact
+  document.getElementById('contact-email').value = userEmail;
+  document.getElementById('contact-phone').value = userPhone;
+
+  // Boarding/dropping points
+  const bp = document.getElementById('boarding-point');
+  const dp = document.getElementById('dropping-point');
+  tempBooking.boardingPoints.forEach(p => bp.add(new Option(p, p)));
+  tempBooking.droppingPoints.forEach(p => dp.add(new Option(p, p)));
+
+  // Passenger forms
+  const pForms = document.getElementById('passenger-forms');
+  pForms.innerHTML = tempBooking.seats.map((seat, i) => `
+    <div class="passenger-row">
+      <h4>Passenger ${i + 1} — Seat ${seat}</h4>
+      <div class="row3">
+        <div class="form-group" style="margin:0"><label>Full Name</label>
+          <input type="text" id="p-name-${i}" placeholder="Full name" value="${i === 0 ? userName : ''}">
+        </div>
+        <div class="form-group" style="margin:0"><label>Age</label>
+          <input type="number" id="p-age-${i}" placeholder="Age" min="1" max="120" value="${i === 0 ? userAge : ''}">
+        </div>
+        <div class="form-group" style="margin:0"><label>Gender</label>
+          <select id="p-gender-${i}"><option>Male</option><option>Female</option><option>Other</option></select>
+        </div>
+      </div>
+    </div>`).join('');
+
+  function renderSidebar() {
+    document.getElementById('sidebar-summary').innerHTML = `
+      <div class="fare-row" style="font-weight:500;color:var(--text)"><span>${tempBooking.from} → ${tempBooking.to}</span></div>
+      <div class="fare-row"><span>Date</span><span>${formatDate(tempBooking.travelDate)}</span></div>
+      <div class="fare-row"><span>Bus</span><span>${tempBooking.busName}</span></div>
+      <div class="fare-row"><span>Type</span><span>${tempBooking.type}</span></div>
+      <div class="fare-row"><span>Seats</span><span>${tempBooking.seats.map(s => `<span class="seat-tag">${s}</span>`).join('')}</span></div>
+      <div class="fare-row"><span>Base Fare</span><span>${formatCurrency(tempBooking.baseFare)}</span></div>
+      <div class="fare-row"><span>GST (5%)</span><span>${formatCurrency(tempBooking.tax)}</span></div>
+      <div class="fare-row"><span>Convenience</span><span>${formatCurrency(tempBooking.convenience)}</span></div>
+      <div class="fare-row total"><span>Total</span><span style="color:var(--primary)">${formatCurrency(tempBooking.totalFare)}</span></div>`;
+    document.getElementById('pay-amount').textContent = formatCurrency(tempBooking.totalFare);
+  }
+  renderSidebar();
+
+  function goToPayment() {
+    for (let i = 0; i < tempBooking.seats.length; i++) {
+      const name = document.getElementById(`p-name-${i}`).value.trim();
+      const age = document.getElementById(`p-age-${i}`).value;
+      if (!name || !age) { showToast(`Fill details for Passenger ${i + 1}`, 'error'); return; }
+    }
+    const email = document.getElementById('contact-email').value.trim();
+    const phone = document.getElementById('contact-phone').value.trim();
+    if (!email || !phone) { showToast('Please fill contact details', 'error'); return; }
+    document.getElementById('step1-content').style.display = 'none';
+    document.getElementById('step2-content').style.display = 'block';
+    document.getElementById('step1-tab').className = 'step done';
+    document.getElementById('step2-tab').className = 'step active';
+  }
+
+  function goBack() {
+    document.getElementById('step2-content').style.display = 'none';
+    document.getElementById('step1-content').style.display = 'block';
+    document.getElementById('step1-tab').className = 'step active';
+    document.getElementById('step2-tab').className = 'step';
+  }
+
+  function selectPayment(method, el) {
+    selectedPayMethod = method;
+    document.querySelectorAll('.pay-option').forEach(e => e.classList.remove('selected'));
+    el.classList.add('selected');
+    document.querySelectorAll('.pay-form').forEach(e => e.classList.remove('show'));
+    document.getElementById(method + '-form').classList.add('show');
+  }
+
+  async function processPayment() {
+    const btn = document.getElementById('pay-btn');
+    btn.innerHTML = '<span class="spinner"></span> Processing...'; btn.disabled = true;
+
+    const passengers = tempBooking.seats.map((seat, i) => ({
+      seat,
+      name: document.getElementById(`p-name-${i}`).value.trim(),
+      age: parseInt(document.getElementById(`p-age-${i}`).value),
+      gender: document.getElementById(`p-gender-${i}`).value,
+    }));
+
+    // Simulate payment delay
+    await new Promise(r => setTimeout(r, 2000));
+
+    const res = await apiPost('/api/confirm-booking/', {
+      temp_booking: tempBooking,
+      passengers,
+      boardingPoint: document.getElementById('boarding-point').value,
+      droppingPoint: document.getElementById('dropping-point').value,
+      contactEmail: document.getElementById('contact-email').value,
+      contactPhone: document.getElementById('contact-phone').value,
+      paymentMethod: selectedPayMethod,
+    });
+
+    if (res.success) {
+      showToast('Payment successful! Booking confirmed 🎉');
+      setTimeout(() => window.location.href = `/ticket/?id=${res.bookingId}`, 1000);
+    } else {
+      showToast(res.error || 'Something went wrong', 'error');
+      btn.innerHTML = 'Pay ' + formatCurrency(tempBooking.totalFare); btn.disabled = false;
+    }
+  }
+
+  const cardInput = document.getElementById('card-num');
+  if (cardInput) {
+    cardInput.addEventListener('input', function() {
+      this.value = this.value.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim();
+    });
+  }
+</script>
+{% endblock %}

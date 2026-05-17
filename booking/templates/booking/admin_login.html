@@ -1,0 +1,59 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login - BusBook</title>
+  <link rel="stylesheet" href="{% static 'booking/css/style.css' %}">
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #1a2535, #2d4059); }
+    .admin-login-card { background: white; border-radius: 14px; padding: 40px; width: 380px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+    .admin-logo { text-align: center; margin-bottom: 28px; }
+    .admin-logo .icon { font-size: 2.5rem; margin-bottom: 8px; }
+    .admin-logo h2 { font-size: 1.3rem; color: var(--text); }
+    .admin-logo p { color: var(--text-muted); font-size: 0.85rem; }
+    .admin-btn { width: 100%; padding: 12px; font-size: 1rem; }
+    .hint { text-align: center; margin-top: 16px; font-size: 0.8rem; color: var(--text-muted); background: var(--bg); border-radius: 6px; padding: 8px; }
+  </style>
+</head>
+<body>
+<div class="admin-login-card">
+  <div class="admin-logo">
+    <div class="icon">🛡️</div>
+    <h2>Admin Panel</h2>
+    <p>BusBook Administration</p>
+  </div>
+  <div class="form-group">
+    <label>Admin Email</label>
+    <input type="email" id="admin-email" placeholder="admin@busbook.com" value="admin@busbook.com">
+  </div>
+  <div class="form-group">
+    <label>Password</label>
+    <input type="password" id="admin-pass" placeholder="Enter admin password" value="admin123">
+  </div>
+  <button class="btn btn-primary admin-btn" id="login-btn" onclick="doAdminLogin()">Login to Dashboard</button>
+  <div class="hint">Default credentials filled above for demo purposes</div>
+</div>
+{% csrf_token %}
+<script src="{% static 'booking/js/utils.js' %}"></script>
+<script>
+  async function doAdminLogin() {
+    const email = document.getElementById('admin-email').value.trim();
+    const pass = document.getElementById('admin-pass').value;
+    const btn = document.getElementById('login-btn');
+    if (!email || !pass) { showToast('Fill all fields', 'error'); return; }
+    btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true;
+    const res = await apiPost('/api/admin-login/', { email, password: pass });
+    if (res.success) {
+      showToast('Welcome, Admin!');
+      setTimeout(() => window.location.href = '/admin-panel/', 700);
+    } else {
+      showToast(res.error || 'Invalid credentials', 'error');
+      btn.innerHTML = 'Login to Dashboard'; btn.disabled = false;
+    }
+  }
+  document.addEventListener('keydown', e => { if (e.key === 'Enter') doAdminLogin(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+{% extends "booking/base.html" %}
+{% load static %}
+
+{% block title %}Your Ticket - BusBook{% endblock %}
+
+{% block extra_css %}
+<style>
+  .ticket-page { max-width: 700px; margin: 32px auto; padding: 0 20px; }
+  .confirm-banner { background: linear-gradient(135deg, #27ae60, #2ecc71); color: white; border-radius: 14px; padding: 24px; text-align: center; margin-bottom: 28px; position: relative; overflow: hidden; }
+  .confirm-banner::before { content: '✓'; position: absolute; font-size: 8rem; right: -10px; top: -20px; opacity: 0.1; font-weight: 900; }
+  .confirm-banner .checkmark { font-size: 2.5rem; margin-bottom: 8px; }
+  .confirm-banner h2 { font-size: 1.4rem; margin-bottom: 4px; }
+  .confirm-banner p { opacity: 0.85; font-size: 0.9rem; }
+  .booking-id { font-size: 0.85rem; background: rgba(255,255,255,0.2); padding: 4px 14px; border-radius: 20px; display: inline-block; margin-top: 8px; font-family: monospace; letter-spacing: 1px; }
+  .ticket { background: white; border-radius: 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.12); overflow: hidden; margin-bottom: 20px; }
+  .ticket-header { background: var(--secondary); color: white; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; }
+  .ticket-header .logo-text { font-family: 'Sora', sans-serif; font-size: 1.2rem; font-weight: 700; }
+  .ticket-header .logo-text span { color: var(--primary); }
+  .ticket-body { padding: 24px; }
+  .route-display { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; background: var(--bg); border-radius: 10px; padding: 16px; }
+  .place-block { text-align: center; }
+  .place-block .time { font-size: 1.8rem; font-weight: 700; font-family: 'Sora', sans-serif; color: var(--text); }
+  .place-block .city { font-size: 1rem; font-weight: 600; color: var(--text); }
+  .place-block .date { font-size: 0.8rem; color: var(--text-muted); }
+  .route-arrow { text-align: center; color: var(--text-muted); }
+  .route-arrow .bus-icon { font-size: 1.5rem; }
+  .route-arrow .dur { font-size: 0.8rem; }
+  .tear-line { display: flex; align-items: center; margin: 20px 0; position: relative; }
+  .tear-line::before, .tear-line::after { content: ''; flex: 1; border-top: 2px dashed var(--border); }
+  .tear-circle { width: 20px; height: 20px; border-radius: 50%; background: var(--bg); margin: 0 10px; flex-shrink: 0; }
+  .info-grid-ticket { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+  .info-box { background: var(--bg); border-radius: 8px; padding: 12px; text-align: center; }
+  .info-box .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 5px; }
+  .info-box .val { font-size: 0.92rem; font-weight: 600; }
+  .passenger-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-bottom: 20px; }
+  .passenger-table th { background: var(--bg); padding: 10px 12px; text-align: left; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+  .passenger-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .ticket-bottom { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; background: var(--bg); border-top: 1px solid var(--border); }
+  .qr-section { text-align: center; }
+  .qr-label { font-size: 0.72rem; color: var(--text-muted); margin-top: 6px; }
+  .total-display { text-align: right; }
+  .total-display .amount { font-size: 1.6rem; font-weight: 700; font-family: 'Sora', sans-serif; color: var(--primary); }
+  .total-display .label { font-size: 0.78rem; color: var(--text-muted); }
+  .action-buttons { display: flex; gap: 12px; }
+  @media (max-width: 580px) { .info-grid-ticket { grid-template-columns: 1fr 1fr; } .ticket-bottom { flex-direction: column; gap: 16px; } .action-buttons { flex-direction: column; } }
+  @media print { nav, .confirm-banner, .action-buttons, .page-header { display: none; } .ticket-page { margin: 0; padding: 0; max-width: 100%; } .ticket { box-shadow: none; border: 1px solid #ddd; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ticket-page">
+  <div class="confirm-banner" id="confirm-banner">
+    <div class="checkmark">✅</div>
+    <h2>Booking Confirmed!</h2>
+    <p>Your tickets are ready. Have a safe journey!</p>
+    <div class="booking-id" id="banner-booking-id">Loading...</div>
+  </div>
+  <div class="ticket" id="ticket-container"></div>
+  <div class="action-buttons">
+    <button class="btn btn-secondary" onclick="window.print()">🖨️ Print Ticket</button>
+    <button class="btn btn-outline" onclick="window.location.href='/bookings/'">📋 View All Bookings</button>
+    <button class="btn btn-primary" onclick="window.location.href='/'">🏠 Back to Home</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<div id="booking-data" style="display:none">{{ booking_json }}</div>
+<script>
+  const booking = JSON.parse(document.getElementById('booking-data').textContent);
+  const autoprint = '{{ autoprint }}';
+
+  if (!booking) {
+    document.querySelector('.ticket-page').innerHTML = `
+      <div class="empty-state"><div class="icon">😕</div><h3>Booking not found</h3>
+      <p><a href="/" style="color:var(--primary)">Go back to home</a></p></div>`;
+  } else {
+    renderTicket(booking);
+    if (autoprint === '1') {
+      window.addEventListener('load', () => setTimeout(() => window.print(), 600));
+    }
+  }
+
+  function renderTicket(b) {
+    document.getElementById('banner-booking-id').textContent = 'Booking ID: ' + b.bookingId;
+    const qrSvg = generateQRCode(b.bookingId);
+
+    document.getElementById('ticket-container').innerHTML = `
+      <div class="ticket-header">
+        <div class="logo-text">🚌 Bus<span>Book</span></div>
+        <div style="text-align:right;font-size:0.82rem;opacity:0.8">
+          <div>E-Ticket</div>
+          <div style="font-family:monospace;letter-spacing:1px">${b.bookingId}</div>
+        </div>
+      </div>
+      <div class="ticket-body">
+        <div class="route-display">
+          <div class="place-block">
+            <div class="time">${b.departure}</div>
+            <div class="city">${b.from}</div>
+            <div class="date">${formatDate(b.travelDate)}</div>
+          </div>
+          <div class="route-arrow">
+            <div class="bus-icon">🚌</div>
+            <div class="dur">${b.duration}</div>
+          </div>
+          <div class="place-block">
+            <div class="time">${b.arrival}</div>
+            <div class="city">${b.to}</div>
+            <div class="date">${b.departure > b.arrival ? 'Next Day' : formatDate(b.travelDate)}</div>
+          </div>
+        </div>
+        <div class="info-grid-ticket">
+          <div class="info-box"><div class="label">Bus Name</div><div class="val">${b.busName}</div></div>
+          <div class="info-box"><div class="label">Bus Type</div><div class="val">${b.type}</div></div>
+          <div class="info-box"><div class="label">Seats</div><div class="val">${b.seats.join(', ')}</div></div>
+          <div class="info-box"><div class="label">Boarding</div><div class="val" style="font-size:0.8rem">${b.boardingPoint}</div></div>
+          <div class="info-box"><div class="label">Dropping</div><div class="val" style="font-size:0.8rem">${b.droppingPoint}</div></div>
+          <div class="info-box"><div class="label">Status</div><div class="val" style="color:var(--success)">✓ Confirmed</div></div>
+        </div>
+        <div class="tear-line"><div class="tear-circle"></div><div class="tear-circle"></div></div>
+        <h4 style="margin-bottom:10px;font-size:0.88rem;color:var(--text-muted)">PASSENGER DETAILS</h4>
+        <table class="passenger-table">
+          <thead><tr><th>#</th><th>Name</th><th>Age</th><th>Gender</th><th>Seat</th></tr></thead>
+          <tbody>
+            ${b.passengers.map((p, i) => `
+              <tr><td>${i + 1}</td><td>${p.name}</td><td>${p.age}</td><td>${p.gender}</td><td><strong>${p.seat}</strong></td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="ticket-bottom">
+        <div class="qr-section">${qrSvg}<div class="qr-label">Scan at boarding</div></div>
+        <div style="flex:1;padding:0 20px;font-size:0.82rem;color:var(--text-muted)">
+          <div><strong>Contact:</strong> ${b.contactEmail}</div>
+          <div><strong>Phone:</strong> ${b.contactPhone}</div>
+          <div><strong>Payment:</strong> ${b.paymentMethod.toUpperCase()}</div>
+          <div style="margin-top:8px;font-size:0.75rem;line-height:1.5">
+            Please carry this e-ticket and a valid ID proof.<br>Report 15 mins before departure.
+          </div>
+        </div>
+        <div class="total-display">
+          <div class="label">Amount Paid</div>
+          <div class="amount">${formatCurrency(b.totalFare)}</div>
+          <div class="label">(incl. all taxes)</div>
+        </div>
+      </div>`;
+  }
+</script>
+{% endblock %}

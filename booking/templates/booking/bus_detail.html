@@ -1,0 +1,259 @@
+{% extends "booking/base.html" %}
+{% load static %}
+
+{% block title %}Select Seats - BusBook{% endblock %}
+
+{% block extra_css %}
+<style>
+  .detail-layout { max-width: 1100px; margin: 28px auto; padding: 0 20px; display: grid; grid-template-columns: 1fr 340px; gap: 24px; }
+  .bus-info-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 20px; }
+  .bus-info-header { background: var(--secondary); color: white; padding: 20px 24px; }
+  .bus-info-header h2 { font-size: 1.2rem; margin-bottom: 4px; }
+  .bus-info-header p { opacity: 0.7; font-size: 0.85rem; }
+  .bus-info-body { padding: 20px 24px; }
+  .route-strip { display: flex; align-items: center; gap: 20px; margin-bottom: 20px; }
+  .route-point { text-align: center; }
+  .route-point .time { font-size: 1.6rem; font-weight: 700; font-family: 'Sora', sans-serif; }
+  .route-point .city { font-size: 0.85rem; color: var(--text-muted); }
+  .route-line { flex: 1; height: 2px; background: var(--border); position: relative; }
+  .route-line::after { content: '🚌'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); font-size: 1rem; }
+  .info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .info-item { background: var(--bg); border-radius: 8px; padding: 12px; text-align: center; }
+  .info-item .label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
+  .info-item .value { font-weight: 600; font-size: 0.95rem; }
+  .points-section { margin-top: 20px; }
+  .points-section h4 { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .point-tag { display: inline-block; background: #e8f4fd; color: #2980b9; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; margin: 3px; }
+  .review-item { padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .review-item:last-child { border: none; }
+  .review-top { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .review-user { font-weight: 600; font-size: 0.88rem; }
+  .review-comment { font-size: 0.85rem; color: var(--text-muted); }
+  .seat-map-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; }
+  .seat-legend { display: flex; gap: 14px; margin-bottom: 16px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-muted); }
+  .legend-dot { width: 18px; height: 18px; border-radius: 4px; }
+  .ld-available { background: #27ae60; }
+  .ld-booked { background: #e74c3c; }
+  .ld-selected { background: #2980b9; }
+  .bus-body { background: #f8f9fc; border: 2px solid var(--border); border-radius: 10px; padding: 14px; }
+  .driver-area { text-align: right; margin-bottom: 12px; font-size: 0.75rem; color: var(--text-muted); }
+  .seat-row { display: flex; gap: 6px; margin-bottom: 14px; align-items: center; justify-content: center; }
+  .seat-gap { width: 28px; flex-shrink: 0; }
+  .seat { width: 36px; height: 36px; border-radius: 6px 6px 4px 4px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 600; font-family: 'Sora', sans-serif; transition: all 0.15s; position: relative; }
+  .seat::before { content: ''; position: absolute; top: -5px; left: 3px; right: 3px; height: 6px; background: inherit; border-radius: 3px 3px 0 0; filter: brightness(0.85); pointer-events: none; }
+  .seat.available { background: #27ae60; color: white; }
+  .seat.available:hover { background: #219a52; transform: scale(1.1); }
+  .seat.booked { background: #e74c3c; color: white; cursor: not-allowed; }
+  .seat.selected { background: #2980b9; color: white; transform: scale(1.1); box-shadow: 0 0 0 3px rgba(41,128,185,0.3); animation: pulse 1s ease-in-out infinite alternate; }
+  @keyframes pulse { from { box-shadow: 0 0 0 3px rgba(41,128,185,0.3); } to { box-shadow: 0 0 0 5px rgba(41,128,185,0.5); } }
+  .booking-sidebar { position: sticky; top: 80px; }
+  .summary-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; }
+  .summary-card h3 { margin-bottom: 16px; font-size: 1rem; }
+  .selected-seats-display { min-height: 44px; background: var(--bg); border-radius: 8px; padding: 10px; margin-bottom: 14px; font-size: 0.85rem; }
+  .seat-chip { display: inline-block; background: #2980b9; color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.78rem; margin: 2px; }
+  .fare-row { display: flex; justify-content: space-between; font-size: 0.88rem; margin-bottom: 8px; color: var(--text-muted); }
+  .fare-row.total { font-weight: 700; font-size: 1rem; color: var(--text); border-top: 1px solid var(--border); padding-top: 10px; margin-top: 6px; }
+  @media (max-width: 768px) { .detail-layout { grid-template-columns: 1fr; } .booking-sidebar { position: static; } .info-grid { grid-template-columns: 1fr 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="detail-layout">
+  <div>
+    <div class="bus-info-card" id="bus-info"></div>
+    <div class="seat-map-card">
+      <h3 style="margin-bottom:14px">🪑 Select Your Seat</h3>
+      <div class="seat-legend">
+        <div class="legend-item"><div class="legend-dot ld-available"></div> Available</div>
+        <div class="legend-item"><div class="legend-dot ld-booked"></div> Booked</div>
+        <div class="legend-item"><div class="legend-dot ld-selected"></div> Selected</div>
+      </div>
+      <div class="bus-body">
+        <div class="driver-area">🚗 Driver</div>
+        <div id="seat-layout"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:20px">
+      <h3 style="margin-bottom:14px">⭐ Passenger Reviews</h3>
+      <div id="reviews-list"></div>
+    </div>
+  </div>
+
+  <div class="booking-sidebar">
+    <div class="summary-card">
+      <h3>🧾 Booking Summary</h3>
+      <div style="margin-bottom:12px">
+        <div class="fare-row"><span>Route</span><span id="summary-route" style="font-weight:500;color:var(--text)">-</span></div>
+        <div class="fare-row"><span>Date</span><span id="summary-date" style="font-weight:500;color:var(--text)">-</span></div>
+        <div class="fare-row"><span>Bus</span><span id="summary-bus" style="font-weight:500;color:var(--text)">-</span></div>
+      </div>
+      <div style="margin-bottom:12px">
+        <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:6px">Selected Seats</div>
+        <div class="selected-seats-display" id="selected-seats-display">
+          <span style="color:var(--text-muted)">No seats selected</span>
+        </div>
+      </div>
+      <div id="fare-breakdown"></div>
+      <button class="btn btn-primary" id="proceed-btn" style="width:100%;margin-top:16px" onclick="proceedToBooking()" disabled>
+        Proceed to Book
+      </button>
+    </div>
+  </div>
+</div>
+{% csrf_token %}
+{% endblock %}
+
+{% block extra_js %}
+<div id="bus-data" style="display:none">{{ bus_json }}</div>
+<script>
+  const bus = JSON.parse(document.getElementById('bus-data').textContent);
+  const travelDate = '{{ travel_date }}';
+  const fromCity = '{{ from_city }}';
+  const toCity = '{{ to_city }}';
+  const isLoggedIn = {% if user %}true{% else %}false{% endif %};
+
+  let selectedSeats = [];
+
+  if (!bus) {
+    document.querySelector('.detail-layout').innerHTML = '<div class="empty-state"><div class="icon">😕</div><h3>Bus not found</h3><p><a href="/">Go back home</a></p></div>';
+  } else {
+    renderBusInfo();
+    renderSeats();
+    renderReviews();
+    updateSummary();
+  }
+
+  function renderBusInfo() {
+    const badgeClass = bus.type === 'AC' ? 'badge-ac' : bus.type === 'Sleeper' ? 'badge-sleeper' : 'badge-nonac';
+    const stars = '★'.repeat(Math.floor(bus.rating)) + '☆'.repeat(5 - Math.floor(bus.rating));
+    document.getElementById('bus-info').innerHTML = `
+      <div class="bus-info-header">
+        <h2>${bus.name} &nbsp; <span class="badge ${badgeClass}">${bus.type}</span></h2>
+        <p>${bus.operator} &nbsp;·&nbsp; <span class="stars">${stars}</span> ${bus.rating}/5</p>
+      </div>
+      <div class="bus-info-body">
+        <div class="route-strip">
+          <div class="route-point"><div class="time">${bus.departure}</div><div class="city">${bus.from}</div></div>
+          <div class="route-line"></div>
+          <div style="text-align:center;color:var(--text-muted);font-size:0.85rem">${bus.duration}</div>
+          <div class="route-line"></div>
+          <div class="route-point"><div class="time">${bus.arrival}</div><div class="city">${bus.to}</div></div>
+        </div>
+        <div class="info-grid">
+          <div class="info-item"><div class="label">Date</div><div class="value">${formatDate(travelDate)}</div></div>
+          <div class="info-item"><div class="label">Total Seats</div><div class="value">${bus.totalSeats}</div></div>
+          <div class="info-item"><div class="label">Available</div><div class="value" style="color:var(--success)">${bus.totalSeats - bus.bookedSeats.length}</div></div>
+        </div>
+        <div class="points-section">
+          <h4>Boarding Points</h4>
+          ${bus.boardingPoints.map(p => `<span class="point-tag">📍 ${p}</span>`).join('')}
+        </div>
+        <div class="points-section">
+          <h4>Dropping Points</h4>
+          ${bus.droppingPoints.map(p => `<span class="point-tag">🏁 ${p}</span>`).join('')}
+        </div>
+        <div style="margin-top:16px">
+          <h4 style="font-size:0.85rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Amenities</h4>
+          ${bus.amenities.map(a => `<span class="amenity-tag">✓ ${a}</span>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  function renderSeats() {
+    const container = document.getElementById('seat-layout');
+    const rows = 'ABCDEFGHIJ'.slice(0, Math.ceil(bus.totalSeats / 4));
+    let html = '';
+    for (const row of rows) {
+      html += '<div class="seat-row">';
+      for (let num = 1; num <= 4; num++) {
+        if (num === 3) html += '<div class="seat-gap"></div>';
+        const seatId = row + num;
+        let cls = bus.bookedSeats.includes(seatId) ? 'booked' : 'available';
+        html += `<button class="seat ${cls}" id="seat-${seatId}" onclick="toggleSeat('${seatId}')" title="${seatId} - ${cls === 'booked' ? 'Booked' : 'Available'}">${seatId}</button>`;
+      }
+      html += '</div>';
+    }
+    container.innerHTML = html;
+  }
+
+  function toggleSeat(seatId) {
+    if (bus.bookedSeats.includes(seatId)) return;
+    const btn = document.getElementById('seat-' + seatId);
+    const idx = selectedSeats.indexOf(seatId);
+    if (idx === -1) {
+      if (selectedSeats.length >= 6) { showToast('Max 6 seats allowed per booking', 'error'); return; }
+      selectedSeats.push(seatId);
+      btn.classList.remove('available'); btn.classList.add('selected');
+    } else {
+      selectedSeats.splice(idx, 1);
+      btn.classList.remove('selected'); btn.classList.add('available');
+    }
+    updateSummary();
+  }
+
+  function updateSummary() {
+    document.getElementById('summary-route').textContent = `${fromCity} → ${toCity}`;
+    document.getElementById('summary-date').textContent = formatDate(travelDate);
+    document.getElementById('summary-bus').textContent = bus.name;
+
+    const display = document.getElementById('selected-seats-display');
+    display.innerHTML = selectedSeats.length === 0
+      ? '<span style="color:var(--text-muted)">No seats selected</span>'
+      : selectedSeats.map(s => `<span class="seat-chip">${s}</span>`).join('');
+
+    const basefare = bus.price * selectedSeats.length;
+    const tax = Math.round(basefare * 0.05);
+    const convenience = selectedSeats.length > 0 ? 30 : 0;
+    const total = basefare + tax + convenience;
+
+    const fareDiv = document.getElementById('fare-breakdown');
+    fareDiv.innerHTML = selectedSeats.length === 0 ? '' : `
+      <div class="fare-row"><span>${formatCurrency(bus.price)} × ${selectedSeats.length} seat(s)</span><span>${formatCurrency(basefare)}</span></div>
+      <div class="fare-row"><span>GST (5%)</span><span>${formatCurrency(tax)}</span></div>
+      <div class="fare-row"><span>Convenience Fee</span><span>${formatCurrency(convenience)}</span></div>
+      <div class="fare-row total"><span>Total</span><span style="color:var(--primary)">${formatCurrency(total)}</span></div>`;
+
+    document.getElementById('proceed-btn').disabled = selectedSeats.length === 0;
+  }
+
+  async function proceedToBooking() {
+    if (!isLoggedIn) {
+      showToast('Please login to continue', 'info');
+      setTimeout(() => { window.location.href = `/login/?redirect=${encodeURIComponent(window.location.href)}`; }, 800);
+      return;
+    }
+    const basefare = bus.price * selectedSeats.length;
+    const tax = Math.round(basefare * 0.05);
+    const convenience = 30;
+    const total = basefare + tax + convenience;
+
+    const tempBooking = {
+      busId: bus.id, busName: bus.name, operator: bus.operator, type: bus.type,
+      from: fromCity, to: toCity, departure: bus.departure, arrival: bus.arrival,
+      duration: bus.duration, travelDate, seats: selectedSeats,
+      pricePerSeat: bus.price, baseFare: basefare, tax, convenience, totalFare: total,
+      boardingPoints: bus.boardingPoints, droppingPoints: bus.droppingPoints,
+    };
+
+    await apiPost('/api/save-temp-booking/', tempBooking);
+    window.location.href = '/checkout/';
+  }
+
+  function renderReviews() {
+    const container = document.getElementById('reviews-list');
+    if (!bus.reviews || bus.reviews.length === 0) {
+      container.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem">No reviews yet for this bus.</p>';
+      return;
+    }
+    container.innerHTML = bus.reviews.map(r => `
+      <div class="review-item">
+        <div class="review-top">
+          <span class="review-user">${r.user}</span>
+          <span class="stars">${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)}</span>
+        </div>
+        <div class="review-comment">${r.comment}</div>
+      </div>`).join('');
+  }
+</script>
+{% endblock %}

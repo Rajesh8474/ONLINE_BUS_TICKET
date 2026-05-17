@@ -1,0 +1,40 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}BusBook{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'booking/css/style.css' %}">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+{% block nav %}
+<nav>
+  <a class="logo" href="/">🚌 Bus<span>Book</span></a>
+  <div id="nav-right">
+    {% if user %}
+      <span class="nav-user">Hi, {{ user.name|truncatewords:1 }}</span>
+      <a href="/bookings/">My Bookings</a>
+      <a href="/profile/" class="hide-mobile">Profile</a>
+      <a href="#" onclick="doLogout()">Logout</a>
+    {% else %}
+      <a href="/login/">Login</a>
+      <a href="/register/" class="btn-nav">Register</a>
+    {% endif %}
+  </div>
+</nav>
+{% endblock %}
+
+{% block content %}{% endblock %}
+
+<script src="{% static 'booking/js/utils.js' %}"></script>
+{% block extra_js %}{% endblock %}
+
+<script>
+function doLogout() {
+  fetch('/api/logout/').then(() => { window.location.href = '/'; });
+}
+</script>
+</body>
+</html>

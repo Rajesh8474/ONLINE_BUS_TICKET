@@ -1,0 +1,244 @@
+{% extends "booking/base.html" %}
+{% load static %}
+
+{% block title %}Search Results - BusBook{% endblock %}
+
+{% block extra_css %}
+<style>
+  .search-bar-sticky { background: var(--secondary); padding: 14px 20px; }
+  .search-bar-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .search-bar-inner input, .search-bar-inner input[type="date"] { padding: 8px 12px; border: 1.5px solid rgba(255,255,255,0.2); border-radius: 8px; background: rgba(255,255,255,0.1); color: white; font-family: 'DM Sans', sans-serif; font-size: 0.9rem; }
+  .search-bar-inner input::placeholder { color: rgba(255,255,255,0.5); }
+  .search-bar-inner .btn { padding: 8px 20px; font-size: 0.9rem; }
+  .results-layout { max-width: 1100px; margin: 24px auto; padding: 0 20px; display: grid; grid-template-columns: 260px 1fr; gap: 24px; }
+  .filter-panel { background: white; border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); height: fit-content; position: sticky; top: 80px; }
+  .filter-panel h3 { font-size: 1rem; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .filter-section { margin-bottom: 20px; }
+  .filter-section h4 { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+  .filter-section label { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer; padding: 4px 0; }
+  .filter-section input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary); }
+  .price-range { width: 100%; accent-color: var(--primary); }
+  #price-label { font-size: 0.85rem; color: var(--text-muted); margin-top: 6px; }
+  .results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .results-header h2 { font-size: 1.1rem; }
+  .sort-select { padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; outline: none; }
+  .bus-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; margin-bottom: 16px; border: 1.5px solid transparent; transition: border-color 0.2s, transform 0.2s; }
+  .bus-card:hover { border-color: var(--primary); transform: translateY(-2px); }
+  .bus-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .bus-name { font-size: 1.05rem; font-weight: 600; margin-bottom: 4px; }
+  .bus-operator { font-size: 0.82rem; color: var(--text-muted); }
+  .time-info { display: flex; align-items: center; gap: 16px; flex: 1; justify-content: center; }
+  .time-block { text-align: center; }
+  .time-block .time { font-size: 1.3rem; font-weight: 700; font-family: 'Sora', sans-serif; }
+  .time-block .city { font-size: 0.8rem; color: var(--text-muted); }
+  .duration { text-align: center; color: var(--text-muted); font-size: 0.82rem; }
+  .duration .line { height: 1px; background: var(--border); width: 60px; margin: 4px auto; }
+  .price-block { text-align: right; }
+  .price-block .price { font-size: 1.4rem; font-weight: 700; font-family: 'Sora', sans-serif; color: var(--primary); }
+  .price-block .per { font-size: 0.75rem; color: var(--text-muted); }
+  .bus-card-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .amenity-tag { background: var(--bg); padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; color: var(--text-muted); margin-right: 6px; }
+  .seats-left { font-size: 0.82rem; }
+  .seats-left.low { color: var(--danger); font-weight: 600; }
+  .seats-left.ok { color: var(--success); }
+  @media (max-width: 768px) { .results-layout { grid-template-columns: 1fr; } .filter-panel { position: static; } .bus-card-top { flex-wrap: wrap; } .price-block { text-align: left; } }
+</style>
+{% endblock %}
+
+{% block nav %}
+<nav>
+  <a class="logo" href="/">🚌 Bus<span>Book</span></a>
+  <div id="nav-right">
+    {% if user %}
+      <span class="nav-user">Hi, {{ user.name|truncatewords:1 }}</span>
+      <a href="/bookings/">My Bookings</a>
+      <a href="/profile/" class="hide-mobile">Profile</a>
+      <a href="#" onclick="doLogout()">Logout</a>
+    {% else %}
+      <a href="/login/">Login</a>
+      <a href="/register/" class="btn-nav">Register</a>
+    {% endif %}
+  </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="search-bar-sticky">
+  <div class="search-bar-inner">
+    <div class="autocomplete-wrapper">
+      <input type="text" id="s-from" placeholder="From" autocomplete="off" value="{{ from_city }}">
+      <ul class="autocomplete-list" id="s-from-list" style="color:#333"></ul>
+    </div>
+    <span style="color:white">→</span>
+    <div class="autocomplete-wrapper">
+      <input type="text" id="s-to" placeholder="To" autocomplete="off" value="{{ to_city }}">
+      <ul class="autocomplete-list" id="s-to-list" style="color:#333"></ul>
+    </div>
+    <input type="date" id="s-date" value="{{ travel_date }}">
+    <button class="btn btn-primary" onclick="doSearch()">Search</button>
+  </div>
+</div>
+
+<div class="results-layout">
+  <div class="filter-panel">
+    <h3>🔧 Filters</h3>
+    <div class="filter-section">
+      <h4>Bus Type</h4>
+      <label><input type="checkbox" value="AC" class="type-filter" checked> AC</label>
+      <label><input type="checkbox" value="Non-AC" class="type-filter" checked> Non-AC</label>
+      <label><input type="checkbox" value="Sleeper" class="type-filter" checked> Sleeper</label>
+    </div>
+    <div class="filter-section">
+      <h4>Departure Time</h4>
+      <label><input type="checkbox" value="morning" class="time-filter" checked> Morning (6am–12pm)</label>
+      <label><input type="checkbox" value="afternoon" class="time-filter" checked> Afternoon (12pm–6pm)</label>
+      <label><input type="checkbox" value="night" class="time-filter" checked> Night (6pm–12am)</label>
+      <label><input type="checkbox" value="midnight" class="time-filter" checked> Late Night (12am–6am)</label>
+    </div>
+    <div class="filter-section">
+      <h4>Max Price: <span id="price-label">₹2000</span></h4>
+      <input type="range" class="price-range" id="price-filter" min="100" max="2000" step="50" value="2000">
+    </div>
+    <button class="btn btn-outline" style="width:100%;margin-top:8px" onclick="resetFilters()">Reset Filters</button>
+  </div>
+
+  <div>
+    <div class="results-header">
+      <h2 id="results-title">Loading buses...</h2>
+      <select class="sort-select" id="sort-select" onchange="applyFilters()">
+        <option value="price-asc">Price: Low to High</option>
+        <option value="price-desc">Price: High to Low</option>
+        <option value="depart">Departure Time</option>
+        <option value="rating">Rating</option>
+      </select>
+    </div>
+    <div id="bus-list"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<div id="buses-data" style="display:none">{{ buses_json }}</div>
+<script>
+  const allBuses = JSON.parse(document.getElementById('buses-data').textContent);
+  let currentFrom = "{{ from_city }}";
+  let currentTo = "{{ to_city }}";
+  let currentDate = "{{ travel_date }}";
+
+  setupAutocomplete('s-from', 's-from-list');
+  setupAutocomplete('s-to', 's-to-list');
+
+  const dateInput = document.getElementById('s-date');
+  dateInput.min = new Date().toISOString().split('T')[0];
+
+  function doSearch() {
+    const from = document.getElementById('s-from').value.trim();
+    const to = document.getElementById('s-to').value.trim();
+    const date = document.getElementById('s-date').value;
+    if (!from || !to) { showToast('Enter both cities', 'error'); return; }
+    window.location.href = `/search/?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&date=${date}`;
+  }
+
+  function applyFilters() {
+    const types = [...document.querySelectorAll('.type-filter:checked')].map(c => c.value);
+    const times = [...document.querySelectorAll('.time-filter:checked')].map(c => c.value);
+    const maxPrice = parseInt(document.getElementById('price-filter').value);
+    const sortBy = document.getElementById('sort-select').value;
+
+    let buses = allBuses.filter(b => {
+      if (!types.includes(b.type)) return false;
+      if (b.price > maxPrice) return false;
+      const hour = parseInt(b.departure.split(':')[0]);
+      let timeSlot = hour >= 6 && hour < 12 ? 'morning' : hour >= 12 && hour < 18 ? 'afternoon' : hour >= 18 ? 'night' : 'midnight';
+      if (!times.includes(timeSlot)) return false;
+      return true;
+    });
+
+    if (sortBy === 'price-asc') buses.sort((a, b) => a.price - b.price);
+    else if (sortBy === 'price-desc') buses.sort((a, b) => b.price - a.price);
+    else if (sortBy === 'depart') buses.sort((a, b) => a.departure.localeCompare(b.departure));
+    else if (sortBy === 'rating') buses.sort((a, b) => b.rating - a.rating);
+
+    renderBuses(buses);
+  }
+
+  function renderBuses(buses) {
+    const list = document.getElementById('bus-list');
+    const title = document.getElementById('results-title');
+
+    if (allBuses.length === 0) {
+      if (!currentFrom || !currentTo) {
+        title.textContent = 'Enter a route above to search buses';
+        list.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><h3>Search for buses</h3><p>Enter departure and arrival cities above.</p></div>';
+      } else {
+        title.textContent = `No buses found from ${currentFrom} to ${currentTo}`;
+        list.innerHTML = '<div class="empty-state"><div class="icon">🚌</div><h3>No buses found</h3><p>Try a different route or check back later.</p></div>';
+      }
+      return;
+    }
+
+    title.textContent = `${buses.length} bus${buses.length !== 1 ? 'es' : ''} found · ${currentFrom} → ${currentTo} · ${formatDate(currentDate)}`;
+
+    if (buses.length === 0) {
+      list.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><h3>No buses match your filters</h3><p>Try adjusting the filters.</p></div>`;
+      return;
+    }
+
+    list.innerHTML = buses.map(bus => {
+      const seatsLeft = bus.seatsLeft;
+      const seatClass = seatsLeft <= 5 ? 'low' : 'ok';
+      const badgeClass = bus.type === 'AC' ? 'badge-ac' : bus.type === 'Sleeper' ? 'badge-sleeper' : 'badge-nonac';
+      const starsHtml = '★'.repeat(Math.floor(bus.rating)) + '☆'.repeat(5 - Math.floor(bus.rating));
+      return `
+      <div class="bus-card">
+        <div class="bus-card-top">
+          <div>
+            <div class="bus-name">${bus.name}</div>
+            <div class="bus-operator">${bus.operator}</div>
+            <span class="badge ${badgeClass}" style="margin-top:6px;display:inline-block">${bus.type}</span>
+          </div>
+          <div class="time-info">
+            <div class="time-block"><div class="time">${bus.departure}</div><div class="city">${bus.from}</div></div>
+            <div class="duration"><div>${bus.duration}</div><div class="line"></div><div>→</div></div>
+            <div class="time-block"><div class="time">${bus.arrival}</div><div class="city">${bus.to}</div></div>
+          </div>
+          <div class="price-block">
+            <div class="price">${formatCurrency(bus.price)}</div>
+            <div class="per">per seat</div>
+            <button class="btn btn-primary" style="margin-top:10px;padding:8px 20px;font-size:0.88rem"
+              onclick="selectBus('${bus.id}','${currentDate}')">Select Seats</button>
+          </div>
+        </div>
+        <div class="bus-card-bottom">
+          <div>${bus.amenities.map(a => `<span class="amenity-tag">✓ ${a}</span>`).join('')}</div>
+          <div style="display:flex;align-items:center;gap:16px">
+            <span class="stars">${starsHtml}</span>
+            <span style="font-size:0.82rem;color:var(--text-muted)">${bus.rating}/5</span>
+            <span class="seats-left ${seatClass}">${seatsLeft} seats left</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function selectBus(busId, date) {
+    window.location.href = `/bus-detail/?busId=${busId}&date=${date}&from=${encodeURIComponent(currentFrom)}&to=${encodeURIComponent(currentTo)}`;
+  }
+
+  function resetFilters() {
+    document.querySelectorAll('.type-filter, .time-filter').forEach(c => c.checked = true);
+    document.getElementById('price-filter').value = 2000;
+    document.getElementById('price-label').textContent = '₹2000';
+    applyFilters();
+  }
+
+  document.getElementById('price-filter').addEventListener('input', function() {
+    document.getElementById('price-label').textContent = '₹' + this.value;
+    applyFilters();
+  });
+
+  document.querySelectorAll('.type-filter, .time-filter').forEach(c => c.addEventListener('change', applyFilters));
+
+  applyFilters();
+</script>
+{% endblock %}

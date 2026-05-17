@@ -1,0 +1,239 @@
+{% extends "booking/base.html" %}
+{% load static %}
+
+{% block title %}My Bookings - BusBook{% endblock %}
+
+{% block extra_css %}
+<style>
+  .bookings-wrap { max-width: 900px; margin: 28px auto; padding: 0 20px; }
+  .filter-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .tab { padding: 8px 20px; border-radius: 20px; border: 1.5px solid var(--border); cursor: pointer; font-size: 0.88rem; font-family: 'DM Sans', sans-serif; background: white; color: var(--text-muted); transition: all 0.2s; }
+  .tab.active { background: var(--primary); border-color: var(--primary); color: white; }
+  .booking-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden; border-left: 4px solid var(--success); transition: transform 0.2s; }
+  .booking-card.cancelled { border-left-color: var(--danger); opacity: 0.85; }
+  .booking-card:hover { transform: translateY(-2px); }
+  .booking-card-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+  .booking-id-text { font-size: 0.8rem; color: var(--text-muted); font-family: monospace; }
+  .booking-card-body { padding: 16px 20px; display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; }
+  .route-info { display: flex; align-items: center; gap: 14px; }
+  .route-city { font-size: 1.1rem; font-weight: 700; font-family: 'Sora', sans-serif; }
+  .route-sep { color: var(--text-muted); font-size: 1.2rem; }
+  .route-meta { font-size: 0.82rem; color: var(--text-muted); margin-top: 4px; }
+  .booking-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .booking-actions .btn { padding: 7px 16px; font-size: 0.82rem; }
+  .refund-info { font-size: 0.82rem; color: var(--text-muted); padding: 8px 20px; background: #fff8f8; border-top: 1px solid #ffe0e0; }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; align-items: center; justify-content: center; }
+  .modal-overlay.active { display: flex; }
+  .modal-box { background: white; border-radius: 14px; padding: 28px; width: 360px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+  .modal-box h3 { margin-bottom: 10px; }
+  .modal-box p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px; line-height: 1.5; }
+  .modal-actions { display: flex; gap: 10px; }
+  .modal-actions .btn { flex: 1; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>My Bookings</h1>
+  <p>Track, download or cancel your bookings</p>
+</div>
+
+<div class="bookings-wrap">
+  <div class="filter-tabs">
+    <button class="tab active" onclick="filterBookings('all', this)">All</button>
+    <button class="tab" onclick="filterBookings('Confirmed', this)">Upcoming</button>
+    <button class="tab" onclick="filterBookings('Cancelled', this)">Cancelled</button>
+  </div>
+  <div id="booking-list"></div>
+</div>
+
+<!-- Cancel Modal -->
+<div class="modal-overlay" id="cancel-modal">
+  <div class="modal-box">
+    <h3>Cancel Booking?</h3>
+    <p id="cancel-msg">Are you sure you want to cancel this booking?</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">No, Keep It</button>
+      <button class="btn btn-danger" onclick="confirmCancel()">Yes, Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Review Modal -->
+<div class="modal-overlay" id="review-modal">
+  <div class="modal-box" style="max-width:400px;width:100%">
+    <h3>⭐ Write a Review</h3>
+    <p id="review-bus-name" style="font-weight:600;color:var(--text);margin-top:-6px;margin-bottom:16px;font-size:0.95rem"></p>
+    <div style="margin-bottom:18px">
+      <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:8px">Your Rating</div>
+      <div id="star-picker" style="display:flex;gap:8px;font-size:2.2rem;cursor:pointer;line-height:1">
+        <span data-val="1" style="transition:transform 0.1s">☆</span>
+        <span data-val="2" style="transition:transform 0.1s">☆</span>
+        <span data-val="3" style="transition:transform 0.1s">☆</span>
+        <span data-val="4" style="transition:transform 0.1s">☆</span>
+        <span data-val="5" style="transition:transform 0.1s">☆</span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Your Comment</label>
+      <textarea id="review-comment" rows="3" placeholder="How was your journey? Share your experience..."
+        style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.9rem;resize:vertical;outline:none;transition:border-color 0.2s"
+        onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-outline" onclick="closeReviewModal()" style="flex:1">Cancel</button>
+      <button class="btn btn-primary" onclick="submitReview()" style="flex:2">Submit Review</button>
+    </div>
+  </div>
+</div>
+{% csrf_token %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let allBookings = [];
+  let cancelTarget = null;
+  let currentFilter = 'all';
+  let reviewBusId = null;
+  let reviewBookingId = null;
+  let reviewStars = 0;
+
+  async function loadBookings() {
+    const res = await apiGet('/api/my-bookings/');
+    if (res.success) {
+      allBookings = res.bookings;
+      filterBookings(currentFilter, null);
+    }
+  }
+
+  function filterBookings(status, tabEl) {
+    currentFilter = status;
+    if (tabEl) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tabEl.classList.add('active');
+    }
+    const filtered = status === 'all' ? allBookings : allBookings.filter(b => b.status === status);
+    renderBookings(filtered);
+  }
+
+  function renderBookings(bookings) {
+    const list = document.getElementById('booking-list');
+    if (bookings.length === 0) {
+      list.innerHTML = `<div class="empty-state"><div class="icon">🎫</div><h3>No bookings found</h3>
+        <p>${currentFilter === 'all' ? "You haven't booked any bus yet." : 'No ' + currentFilter.toLowerCase() + ' bookings.'}</p>
+        <a href="/" class="btn btn-primary" style="margin-top:16px">Book a Bus</a></div>`;
+      return;
+    }
+    list.innerHTML = bookings.map(b => {
+      const isCancelled = b.status === 'Cancelled';
+      const canCancel = !isCancelled && new Date(b.travelDate) > new Date();
+      const travelPassed = new Date(b.travelDate + 'T00:00:00') < new Date();
+      const canReview = !isCancelled && travelPassed && !b.reviewed;
+      return `
+      <div class="booking-card ${isCancelled ? 'cancelled' : ''}">
+        <div class="booking-card-header">
+          <div>
+            <div style="font-weight:600">${b.busName} <span style="font-weight:400;color:var(--text-muted)">· ${b.type}</span></div>
+            <div class="booking-id-text">ID: ${b.bookingId}</div>
+          </div>
+          <span class="status-${b.status.toLowerCase()}">${b.status}</span>
+        </div>
+        <div class="booking-card-body">
+          <div>
+            <div class="route-info">
+              <span class="route-city">${b.from}</span>
+              <span class="route-sep">→</span>
+              <span class="route-city">${b.to}</span>
+            </div>
+            <div class="route-meta">
+              📅 ${formatDate(b.travelDate)} &nbsp;·&nbsp;
+              🕐 ${b.departure} → ${b.arrival} &nbsp;·&nbsp;
+              💺 Seats: ${b.seats.join(', ')}
+            </div>
+            <div class="route-meta" style="margin-top:4px">
+              👥 ${b.passengers.length} passenger(s) &nbsp;·&nbsp;
+              💰 ${formatCurrency(b.totalFare)} &nbsp;·&nbsp;
+              💳 ${b.paymentMethod ? b.paymentMethod.toUpperCase() : 'PAID'}
+            </div>
+          </div>
+          <div class="booking-actions">
+            <a href="/ticket/?id=${b.bookingId}" class="btn btn-secondary">🎫 Ticket</a>
+            <button class="btn btn-outline" onclick="printTicket('${b.bookingId}')">⬇️ Download</button>
+            ${canReview ? `<button class="btn" style="background:#f0f4ff;color:#2980b9;border:1.5px solid #c5d8f5" onclick="openReview('${b.busId}','${b.bookingId}','${b.busName}')">⭐ Review</button>` : ''}
+            ${b.reviewed ? `<span style="font-size:0.8rem;color:var(--success);padding:8px 0">✓ Reviewed</span>` : ''}
+            ${canCancel ? `<button class="btn btn-danger" onclick="initCancel('${b.bookingId}','${b.travelDate}','${b.departure}',${b.totalFare})">✕ Cancel</button>` : ''}
+          </div>
+        </div>
+        ${isCancelled && b.refundStatus ? `
+          <div class="refund-info">↩️ Cancellation: <strong>${b.refundStatus}</strong>
+          ${b.refundAmount > 0 ? ` &nbsp;·&nbsp; Refund: <strong>${formatCurrency(b.refundAmount)}</strong>` : ''}
+          </div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  function printTicket(bookingId) {
+    window.open('/ticket/?id=' + bookingId + '&autoprint=1', '_blank');
+  }
+
+  function openReview(busId, bookingId, busName) {
+    reviewBusId = busId; reviewBookingId = bookingId; reviewStars = 0;
+    document.getElementById('review-bus-name').textContent = '🚌 ' + busName;
+    document.getElementById('review-comment').value = '';
+    updateStarDisplay(0);
+    document.getElementById('review-modal').classList.add('active');
+  }
+  function closeReviewModal() { document.getElementById('review-modal').classList.remove('active'); }
+
+  function updateStarDisplay(n) {
+    document.querySelectorAll('#star-picker span').forEach((s, i) => {
+      s.textContent = i < n ? '★' : '☆';
+      s.style.color = i < n ? '#f5a623' : '#ccc';
+    });
+  }
+
+  const starPicker = document.getElementById('star-picker');
+  starPicker.addEventListener('mouseover', e => { if (!e.target.dataset.val) return; updateStarDisplay(parseInt(e.target.dataset.val)); });
+  starPicker.addEventListener('mouseleave', () => { updateStarDisplay(reviewStars); });
+  starPicker.addEventListener('click', e => {
+    if (!e.target.dataset.val) return;
+    reviewStars = parseInt(e.target.dataset.val);
+    e.target.style.transform = 'scale(1.4)';
+    setTimeout(() => e.target.style.transform = 'scale(1)', 200);
+    updateStarDisplay(reviewStars);
+  });
+
+  async function submitReview() {
+    const comment = document.getElementById('review-comment').value.trim();
+    if (!reviewStars) { showToast('Please select a star rating', 'error'); return; }
+    if (!comment) { showToast('Please write a comment', 'error'); return; }
+    const res = await apiPost('/api/submit-review/', { busId: reviewBusId, bookingId: reviewBookingId, stars: reviewStars, comment });
+    if (res.success) { showToast('Thank you for your review! 🙏'); closeReviewModal(); loadBookings(); }
+    else { showToast(res.error || 'Something went wrong', 'error'); }
+  }
+
+  function initCancel(bookingId, travelDate, departure, totalFare) {
+    cancelTarget = bookingId;
+    const hoursLeft = (new Date(travelDate + 'T' + departure) - new Date()) / (1000 * 60 * 60);
+    let refundMsg = hoursLeft >= 24
+      ? `Full refund of ${formatCurrency(totalFare)} will be processed within 3–5 business days.`
+      : hoursLeft > 0
+        ? `Partial refund of ${formatCurrency(Math.floor(totalFare * 0.5))} (50%) — cancellation within 24 hours of departure.`
+        : 'No refund applicable — travel date has already passed.';
+    document.getElementById('cancel-msg').innerHTML = `Are you sure you want to cancel this booking?<br><br><strong>Refund Policy:</strong> ${refundMsg}`;
+    document.getElementById('cancel-modal').classList.add('active');
+  }
+
+  function closeModal() { document.getElementById('cancel-modal').classList.remove('active'); cancelTarget = null; }
+
+  async function confirmCancel() {
+    if (!cancelTarget) return;
+    const res = await apiPost('/api/cancel-booking/', { bookingId: cancelTarget });
+    closeModal();
+    if (res.success) { showToast(`Booking cancelled. ${res.refundStatus}`); loadBookings(); }
+    else { showToast(res.error || 'Something went wrong', 'error'); }
+  }
+
+  loadBookings();
+</script>
+{% endblock %}
